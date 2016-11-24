@@ -103,7 +103,7 @@ port5	riv	05h
 port6	riv	06h
 port7	riv	07h	; 8T35 (open-collector)
 port8	riv	08h
-port9	riv	09h
+dip_sw	riv	09h	; DIP switches, bits 7, 6, 2..0 used
 
 ; 8X320 bus interface from 30h..3fh
 host0	riv	30h
@@ -207,24 +207,25 @@ f_data	riv	5fh
 	xmit	port7,ivr
 	move	aux,driv
 
-	xmit	host9,ivr
-	xmit	09h,driv
+	xmit	host9,ivr	; second cont subsystem status
+	xmit	09h,driv	; controller present, drive 0 ready
 
-	xmit	host8,ivr
-	xmit	19h,driv
+	xmit	host8,ivr	; first cont subsystem status
+	xmit	19h,driv	; double dens, controller present, drive 0 ready
 
-	xmit	port9,ivr
-	xmit	0ebh,aux
-	nzt	sriv[6],x0039
-	xmit	88h,aux
-x0039:	xmit	ram_36,ivl
+	xmit	dip_sw,ivr
+	xmit	0ebh,aux	; HD cont present, drives 0-3 ready
+	nzt	sriv[6],$+2
+	xmit	88h,aux		; HD cont present, drives not ready
+	xmit	ram_36,ivl
 	move	aux,dliv[0]
 
 	xmit	hosta,ivr
 	move	aux,driv
 
+; read DIP switch 2:0 for drive configuration
 	xmit	07h,aux
-	xmit	port9,ivr
+	xmit	dip_sw,ivr
 	xor	sriv[2:0],r1
 	xec	x0041,r1
 
@@ -294,7 +295,7 @@ x007e:	xmit	0c0h,r1
 	call	sub_0627	; ret 0bh
 	jmp	x00ba
 
-x008a:	xmit	port9,ivr
+x008a:	xmit	dip_sw,ivr
 	nzt	sriv[1],x0091
 	xmit	0d0h,r1
 	xmit	0d1h,r2
@@ -324,7 +325,7 @@ x0095:	xmit	05h,r5
 	add	ivl,ivl
 	move	r1,dliv
 	add	ivl,ivl
-	xmit	port9,ivr
+	xmit	dip_sw,ivr
 	xmit	80h,r1
 	nzt	sriv[0],x00ac
 	xmit	01h,r1
@@ -1824,7 +1825,7 @@ sub_0639:
 	call	sub_0ca8	; ret 51h
 	jmp	x0cdb
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_065b:
@@ -1866,7 +1867,7 @@ sub_0676:
 	nzt	sriv[7],x0679
 	jmp	x067a
 
-x0679:	return
+x0679:	return			; inserted automatically by MCCAP
 
 
 x067a:	jmp	x0680
@@ -1882,12 +1883,14 @@ x067a:	jmp	x0680
 
 
 x0680:	nzt	sriv[0],x0689
-	xmit	hosta,ivr
+
+	xmit	hosta,ivr	; clear interrupt pending for all drives
 	xmit	00h,driv[2]
 	xmit	host9,ivr
 	xmit	00h,driv[2]
 	xmit	host8,ivr
 	xmit	00h,driv[2]
+
 	xmit	port1,ivr
 	xmit	01h,driv[5]
 x0689:	xmit	port1,ivr
@@ -2115,7 +2118,7 @@ x0743:	xmit	port1,ivr
 	xmit	01h,aux
 	add	sliv,dliv
 	nzt	ovf,x074f
-	xmit	port9,ivr
+	xmit	dip_sw,ivr
 	move	sriv[7],aux
 	nzt	aux,x0752
 	call	sub_0676	; ret 57h
@@ -2127,7 +2130,7 @@ x0752:	xmit	port1,ivr
 	xmit	1fh,driv[4:0]
 	jmp	x0cd9
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_0756:
@@ -2196,7 +2199,7 @@ x0785:	add	r1,r1
 
 x078e:	jmp	x039a
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_0790:
@@ -2309,7 +2312,7 @@ x07e9:	add	r2,r2
 	nzt	r1,x07e9
 	jmp	x0cd9
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_07ef:
@@ -2349,7 +2352,7 @@ x080c:	xor	sriv,aux
 
 x080f:	jmp	x0831
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_0811:
@@ -2704,7 +2707,7 @@ x0938:	xmit	f_ram+5,ivr
 
 x093c:	jmp	x08a5
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_093e:
@@ -2858,7 +2861,7 @@ x09cc:	xmit	f_csr1,ivr
 	xmit	1fh,driv[4:0]
 	jmp	x0cdb
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_09d3:
@@ -2967,7 +2970,7 @@ x0a30:	xmit	port7,ivr
 	xmit	01h,driv[4]
 	jmp	sub_0bb6
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_0a34:
@@ -2978,7 +2981,7 @@ sub_0a34:
 	move	aux,dliv
 	xmit	ram_41,ivl
 	move	aux,dliv
-	xmit	port9,ivr
+	xmit	dip_sw,ivr
 	xmit	07h,aux
 	xor	sriv[2:0],aux
 	nzt	aux,x0a5f
@@ -3123,7 +3126,7 @@ x0abd:	xmit	20h,aux
 	call	sub_0bb4	; ret 6eh
 x0ac4:	jmp	x0a74
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_0ac6:
@@ -3182,7 +3185,7 @@ x0ae2:	move	r6,aux
 	xmit	00h,dliv
 x0af2:	xmit	port1,ivr
 	xmit	13h,driv[4:0]
-	xmit	port9,ivr
+	xmit	dip_sw,ivr
 	move	sriv[7],aux
 	jmp	x0b00
 
@@ -3248,7 +3251,7 @@ x0b22:	xmit	ram_1c,ivl
 	xmit	1fh,driv[4:0]
 	jmp	x0cd9
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_0b2f:
@@ -3285,7 +3288,7 @@ x0b32:	xmit	port3,ivr
 	xmit	00h,dliv
 	xmit	ram_03,ivl
 	xmit	00h,dliv
-x0b4f:	xmit	port9,ivr
+x0b4f:	xmit	dip_sw,ivr
 	move	sriv[7],aux
 	nzt	aux,x0b5f
 	xmit	01h,aux
@@ -3399,7 +3402,7 @@ x0ba6:	xmit	port7,ivr
 
 x0bb2:	jmp	x0cd9
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_0bb4:
@@ -3677,7 +3680,7 @@ sub_0c95:
 	xmit	00h,dliv[0]
 	jmp	x03b8
 
-	return			; automatically inserted by MCCAP
+	return			; inserted automatically by MCCAP
 
 
 sub_0ca8:
@@ -3770,7 +3773,7 @@ x0cdc:	move	sliv,r11
 	xmit	00h,dliv
 	xmit	ram_03,ivl
 	xmit	00h,dliv
-	xmit	port9,ivr
+	xmit	dip_sw,ivr
 	move	sriv[7],aux
 	jmp	00d2h
 	xmit	01h,aux
