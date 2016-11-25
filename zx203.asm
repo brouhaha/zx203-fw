@@ -127,40 +127,44 @@ f_ram	riv	48h
 
 ; 8X330 floppy control registers
 f_csr1	riv	5ah	; disk command (write), disk status (read)
-			;   7 write gate enable, active low
-			;   6 CRC enable, 1 = compute, 0 = CRC sources data
-			;   5 data register control
+f_wg_n	riv	5ah,7	;   7 write gate enable, active low
+f_crc	riv	5ah,6	;   6 CRC enable, 1 = compute, 0 = CRC sources data
+f_dci	riv	5ah,5	;   5 data register control
 			;        0 = data and clocks interleaved, used to write AM
 			;        1 = data only
-			;   4 sync enable
-			;   3 load counter - 1 to transfer sector length and
+f_syne	riv	5ah,4	;   4 sync enable
+f_ldc	riv	5ah,3	;   3 load counter - 1 to transfer sector length and
 			;                      byte counter MSB to byte counter
-			;   2 byte counter MSB
-			;   1 BYTRA
+f_bycm	riv	5ah,2	;   2 byte counter MSB
+f_bytra	riv	5ah,1	;   1 BYTRA
 			;         1-to-0 transition increments byte counter
-			;   0 disk status 1 input (pin 17)	ready
-f_csr2	riv	5bh	; mode command
-			;   7 precompensation enable, active high
-			;   6 read mode - 0 for read, 1 for write
+fd_dsi1	riv	5ah,0	;   0 disk status 1 input (pin 17)	ready
+
+f_csr2	riv	5bh	; mode control
+f_prec	riv	5bh,7	;   7 precompensation enable, active high
+f_wrmod	riv	5bh,6	;   6 read mode - 0 for read, 1 for write
 			;   5..4  bit selects
-			;   3 preampble select
-			;   2..1  encoding  1x FM, 00 MFM, 01 M2FM
-			;   0 1/2F   0 to halve xfer rate
-fd_cntl	riv	5ch	; disk control
-			;   7 DC1 output (pin 12)	dir
-			;   6 DC2 output (pin 11)	step
-			;   5 DC3 output (pin 10)	drsel
+f_pream	riv	5bh,3	;   3 preamble select
+f_enc	riv	5bh,1,2	;   2..1  encoding  1x FM, 00 MFM, 01 M2FM
+f_rate	riv	5bh,0	;   0 1/2F   0 to halve xfer rate
+
+fd_cntl	riv	5ch	; drive control
+fd_dir	riv	5ch,7	;   7 DC1 output (pin 12)	dir
+fd_step	riv	5ch,6	;   6 DC2 output (pin 11)	step
+fd_drsl	riv	5ch,4,2	;   5 DC3 output (pin 10)	drsel
 			;   4 DC4 output (pin 9)	drsel
-			;   3 DC5 output (pin 8)	side
-			;   2 DC6 output (pin 7)	head load
-			;   1 DC7 output (pin 6)	rwc
+fd_side	riv	5ch,3	;   3 DC5 output (pin 8)	side
+fd_hdld	riv	5ch,2	;   2 DC6 output (pin 7)	head load
+fd_rwc	riv	5ch,1	;   1 DC7 output (pin 6)	rwc
 			;   0 no effect, always reads 0
-fd_sta	riv	5dh	; disk status, read only
-			;   7 DS2 input (pin 16)	track 0
-			;   6 DS3 input (pin 15)	index
-			;   5 DS4 input (pin 14)	write protect
-			;   4 DS5 input (pin 13)	disk changed
+
+fd_sta	riv	5dh	; drive status, read only
+fd_trk0	riv	5dh,7	;   7 DS2 input (pin 16)	track 0
+fd_idx	riv	5dh,6	;   6 DS3 input (pin 15)	index
+fd_wp	riv	5dh,5	;   5 DS4 input (pin 14)	write protect
+fd_dchg	riv	5dh,4	;   4 DS5 input (pin 13)	disk changed (not used)
 			;   3..0 always read 0
+
 f_slen	riv	5eh	; sector length
 f_data	riv	5fh	; data
 
@@ -176,7 +180,7 @@ f_data	riv	5fh	; data
 	move	aux,driv
 
 	xmit	fd_cntl,ivr
-	xmit	38h,aux
+	xmit	38h,aux		; drive sel 3, head
 	move	aux,driv
 
 	xmit	f_csr1,ivr	; turn off write gate enable
@@ -486,7 +490,6 @@ x00d6:	jmp	x0a57
 	add	r1>>>6,r15
 	xor	ivr,dliv[1]
 	jmp	1fcdh
-
 	xmit	0ch,driv[7:5]
 	xmit	0a8h,r3
 	xor	r12,driv[5:0]
@@ -621,10 +624,12 @@ x019a:	xmit	fd_cntl,ivr
 	call	sub_0676	; ret 12h
 	xmit	01h,aux
 	xmit	0fch,r2
-x01a0:	add	r1,r1
+
+x01a0:	add	r1,r1		; delay
 	nzt	r1,x01a0
 	add	r2,r2
 	nzt	r2,x01a0
+
 	add	r5,r5
 	xmit	04h,aux
 	and	r5,aux
@@ -663,7 +668,7 @@ x01bc:	add	r1,r1
 	add	r2,r2
 	nzt	r2,x01bc
 	xmit	fd_sta,ivr
-	move	sriv[7],aux
+	move	sriv[7],aux	; track 0
 	nzt	aux,x01ce
 x01c4:	call	sub_0790	; ret 13h
 	xmit	00h,driv
@@ -687,7 +692,7 @@ x01d4:	add	r1,r1
 	add	r2,r2
 	nzt	r2,x01d4
 	xmit	fd_sta,ivr
-	move	sriv[7],aux
+	move	sriv[7],aux	; track 0?
 	nzt	aux,x01dd
 	jmp	x01c4
 
@@ -699,7 +704,7 @@ x01dd:	add	r3,r3
 	jmp	x039e
 
 x01e4:	xmit	fd_sta,ivr
-	nzt	sriv[5],x01e7
+	nzt	sriv[5],x01e7	; write protect?
 	jmp	x03a2
 
 x01e7:	xmit	ram_06,ivl
@@ -716,13 +721,15 @@ x01e7:	xmit	ram_06,ivl
 	move	aux,driv
 x01f3:	call	sub_07b3	; ret 16h
 	call	sub_07ef	; ret 17h
-	xmit	0d5h,aux
+
+	xmit	(-43)&0ffh,aux	; choose precomp based on track
 	add	r4,aux
 	xmit	f_csr2,ivr
-	xmit	01h,driv[7]
-	nzt	ovf,x01fd
-	xmit	00h,driv[7]
-x01fd:	xmit	0c4h,aux
+	xmit	01h,driv[7]	; precomp enabled
+	nzt	ovf,$+2
+	xmit	00h,driv[7]	; precomp disabled
+
+	xmit	0c4h,aux
 	add	r4,aux
 	xmit	fd_cntl,ivr
 	xmit	00h,driv[1]
@@ -801,8 +808,9 @@ x0244:	xmit	ram_02,ivl
 	xmit	f_csr1,ivr	; enable write gate, enable CRC, data only,
 	xmit	06h,driv[7:4]	; not sync enable
 
+; keep writing r3 until index goes high
 x024a:	xmit	fd_sta,ivr
-	nzt	sriv[6],x0252
+	nzt	sriv[6],x0252	; index?
 
 	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	nzt	sriv[1],$-1
@@ -812,6 +820,7 @@ x024a:	xmit	fd_sta,ivr
 	move	r3,driv
 	jmp	x024a
 
+; keep writing r3 until index goes low
 x0252:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	nzt	sriv[1],$-1
 
@@ -819,7 +828,7 @@ x0252:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	xmit	f_data,ivr
 	move	r3,driv
 	xmit	fd_sta,ivr
-	move	sriv[6],r1
+	move	sriv[6],r1	; index?
 	nzt	r1,x0252
 
 x025a:	xmit	f_csr1,ivr	; wait for BYTRA = 0
@@ -828,6 +837,7 @@ x025a:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
+
 	add	sliv,dliv
 	nzt	ovf,x0262
 	jmp	x025a
@@ -838,15 +848,19 @@ x0262:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
+
 	xmit	0fah,r1
 	nzt	r5,x026a
 	xmit	0fch,r1
 x026a:	move	r1,dliv
-x026b:	xmit	f_csr1,ivr
-	nzt	sriv[1],x026b
+
+x026b:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
+
 	add	sliv,dliv
 	nzt	ovf,x0273
 	jmp	x026b
@@ -857,6 +871,7 @@ x0273:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
+
 	nzt	r5,x0282
 	xmit	0f5h,r4
 
@@ -901,6 +916,7 @@ x0295:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r4,driv
+	
 	xmit	ram_08,ivl
 
 	xmit	f_csr1,ivr	; wait for BYTRA = 0
@@ -917,6 +933,7 @@ x0295:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xmit	00h,driv
+
 	xmit	port2,ivr
 	move	sriv,r1
 
@@ -1008,7 +1025,10 @@ x02e8:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
-	nzt	r5,x02f7
+
+	nzt	r5,x02f7	; M2FM?
+
+; write data=fb clock=c7 FM data address mark
 	xmit	0f5h,r4
 
 	xmit	f_csr1,ivr	; wait for BYTRA = 0
@@ -1025,6 +1045,7 @@ x02f7:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	nzt	sriv[1],$-1
 
 	xmit	07h,driv[6:4]
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
@@ -1035,15 +1056,19 @@ x02f7:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
+
+; write data=0b clock=70, Intel M2FM data address mark
 	xmit	2ah,r4
 
 	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	nzt	sriv[1],$-1
 
 	xmit	05h,driv[6:4]
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r4,driv
+
 	xmit	45h,r4
 
 x030a:	xmit	f_csr1,ivr	; wait for BYTRA = 0
@@ -1277,7 +1302,7 @@ x03bf:	call	sub_0676	; ret 1eh
 x03cc:	jmp	x0140
 
 x03cd:	xmit	fd_sta,ivr
-	nzt	sriv[5],x03d0
+	nzt	sriv[5],x03d0	; write protect?
 	jmp	x03a2
 
 x03d0:	xmit	ram_06,ivl
@@ -1925,6 +1950,7 @@ sub_0639:
 	return			; inserted automatically by MCCAP
 
 
+; ram[ram_38++] := r1
 sub_065b:
 	xmit	ram_38,ivl
 	move	sliv,ivl
@@ -2281,7 +2307,7 @@ sub_077d:
 	xmit	00h,r1
 x0781:	xmit	01h,aux
 	xmit	fd_sta,ivr
-	nzt	sriv[6],x0785
+	nzt	sriv[6],x0785	; index?
 	return
 
 x0785:	add	r1,r1
@@ -2418,14 +2444,16 @@ sub_07ef:
 	move	r5,r4
 	xmit	ram_00,ivl
 	move	sliv[3],r5
-	xmit	0cbh,r1
+	xmit	0cbh,r1		; precomp, write mode, preamble select,
+				; M2FM, full rate
 	nzt	r5,x07f5
-	xmit	45h,r1
+	xmit	45h,r1		; write mode, FM, full rate
 x07f5:	xmit	f_csr2,ivr
 	move	r1,driv
 	xmit	port1,ivr
 	xmit	00h,driv[7]
 	return
+
 
 x07fa:	xmit	f_csr1,ivr
 	xmit	05h,driv[6:4]
@@ -2433,7 +2461,7 @@ x07fa:	xmit	f_csr1,ivr
 	xmit	01h,driv[5]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-	xmit	2ah,aux
+	xmit	2ah,aux		; 2a = first byte of M2FM ID address mark
 	nzt	r5,x0803
 	xmit	0f5h,aux
 x0803:	xor	sriv,aux
@@ -2444,14 +2472,14 @@ x0803:	xor	sriv,aux
 
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-	xmit	54h,aux
+	xmit	54h,aux		; 54 = second byte of M2FM ID address mark
 	nzt	r5,x080c
 	xmit	7eh,aux
 x080c:	xor	sriv,aux
 	nzt	aux,x080f
-	jmp	x0846
+	jmp	x0846		; is an M2FM ID address mark
 
-x080f:	jmp	x0831
+x080f:	jmp	x0831		; not an M2FM ID address mark
 
 	return			; inserted automatically by MCCAP
 
@@ -2461,7 +2489,7 @@ sub_0811:
 	move	r11,dliv
 
 	xmit	f_csr2,ivr
-	xmit	00h,driv[6]
+	xmit	00h,driv[6]	; read mode
 	xmit	0ceh,r4
 	jmp	x083c
 
@@ -2512,10 +2540,10 @@ x0831:	xmit	ram_33,ivl		; restore return address
 
 x083c:	xmit	00h,r2
 x083d:	xmit	f_csr2,ivr
-	xmit	01h,driv[6]
+	xmit	01h,driv[6]	; write mode
 	add	r2,r2
 	nzt	r2,x083d
-	xmit	00h,driv[6]
+	xmit	00h,driv[6]	; read mode
 	jmp	x0817
 
 	return
@@ -2674,8 +2702,10 @@ x08b1:	xmit	ram_24,ivl
 	nzt	ovf,x08b9
 	xmit	01h,driv[1]
 x08b9:	call	sub_0811		; ret 5dh
+
 	xmit	f_csr2,ivr
-	xmit	00h,driv[6]
+	xmit	00h,driv[6]		; read mode
+
 	xmit	f_ram+3,ivr
 	move	sriv[0],aux
 	move	sriv[7:1],r1
@@ -2694,8 +2724,10 @@ x08cb:	add	r2,r2
 	nzt	r2,x08cb
 	add	r3,r3
 	nzt	r3,x08cb
+
 	xmit	f_csr2,ivr
-	xmit	00h,driv[6]
+	xmit	00h,driv[6]	; read mode
+
 x08d1:	xmit	0ffh,aux
 	nzt	r5,x08d4
 	xmit	00h,aux
@@ -2816,8 +2848,10 @@ x0921:	xor	sriv,aux
 	xmit	00h,aux
 x092a:	xor	sriv,aux
 	nzt	aux,x090e
+
 	xmit	f_csr2,ivr
-	xmit	01h,driv[6]
+	xmit	01h,driv[6]	; write mode
+
 	xmit	port1,ivr
 	xmit	00h,driv[7]
 	xmit	ram_24,ivl
@@ -2845,12 +2879,14 @@ sub_093e:
 
 	call	sub_07b3	; ret 5e
 	call	sub_07ef	; ret 5f
-	xmit	0d5h,aux
+
+	xmit	(-43)&0ffh,aux	; choose precomp based on track
 	add	r4,aux
 	xmit	f_csr2,ivr
-	xmit	01h,driv[7]
+	xmit	01h,driv[7]	; precomp enabled
 	nzt	ovf,x094a
-	xmit	00h,driv[7]
+	xmit	00h,driv[7]	; precomp disabled
+
 x094a:	xmit	0c4h,aux
 	add	r4,aux
 	xmit	fd_cntl,ivr
