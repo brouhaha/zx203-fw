@@ -126,12 +126,43 @@ hostf	riv	3fh
 f_ram	riv	48h
 
 ; 8X330 floppy control registers
-f_csr1	riv	5ah
-f_csr2	riv	5bh
-f_csr3	riv	5ch
-f_csr4	riv	5dh
-f_slen	riv	5eh
-f_data	riv	5fh
+f_csr1	riv	5ah	; disk command (write), disk status (read)
+			;   7 write gate enable, active low
+			;   6 CRC enable, 1 = compute, 0 = CRC sources data
+			;   5 data register control
+			;        0 = data and clocks interleaved, used to write AM
+			;        1 = data only
+			;   4 sync enable
+			;   3 load counter - 1 to transfer sector length and
+			;                      byte counter MSB to byte counter
+			;   2 byte counter MSB
+			;   1 BYTRA
+			;         1-to-0 transition increments byte counter
+			;   0 disk status 1 input (pin 17)	ready
+f_csr2	riv	5bh	; mode command
+			;   7 precompensation enable, active high
+			;   6 read mode - 0 for read, 1 for write
+			;   5..4  bit selects
+			;   3 preampble select
+			;   2..1  encoding  1x FM, 00 MFM, 01 M2FM
+			;   0 1/2F   0 to halve xfer rate
+fd_cntl	riv	5ch	; disk control
+			;   7 DC1 output (pin 12)	dir
+			;   6 DC2 output (pin 11)	step
+			;   5 DC3 output (pin 10)	drsel
+			;   4 DC4 output (pin 9)	drsel
+			;   3 DC5 output (pin 8)	side
+			;   2 DC6 output (pin 7)	head load
+			;   1 DC7 output (pin 6)	rwc
+			;   0 no effect, always reads 0
+fd_sta	riv	5dh	; disk status, read only
+			;   7 DS2 input (pin 16)	track 0
+			;   6 DS3 input (pin 15)	index
+			;   5 DS4 input (pin 14)	write protect
+			;   4 DS5 input (pin 13)	disk changed
+			;   3..0 always read 0
+f_slen	riv	5eh	; sector length
+f_data	riv	5fh	; data
 
 
 	org	0
@@ -144,11 +175,11 @@ f_data	riv	5fh
 	xmit	port1,ivr
 	move	aux,driv
 
-	xmit	f_csr3,ivr
+	xmit	fd_cntl,ivr
 	xmit	38h,aux
 	move	aux,driv
 
-	xmit	f_csr1,ivr
+	xmit	f_csr1,ivr	; turn off write gate enable
 	xmit	01h,driv[7]
 
 	xmit	ram_35,ivl
@@ -350,7 +381,7 @@ x00ba:	xmit	ram_35,ivl
 
 ; XXX start of unreachable code?
 	xmit	07h,aux
-	xmit	f_csr3,ivr
+	xmit	fd_cntl,ivr
 	move	aux,driv[7:2]
 	xmit	01h,aux
 	xmit	f_csr1,ivr
@@ -359,7 +390,7 @@ x00ba:	xmit	ram_35,ivl
 	move	aux,driv[0]
 	xmit	host9,ivr
 	move	aux,driv[0]
-	xmit	f_csr3,ivr
+	xmit	fd_cntl,ivr
 	xmit	01h,driv[5]
 	jmp	x03b8
 
@@ -544,10 +575,10 @@ x0166:	call	sub_0676	; 10h
 	jmp	x0146
 
 x0170:	xmit	00h,r5
-x0171:	xmit	f_csr3,ivr
+x0171:	xmit	fd_cntl,ivr
 	xec	x01aa,r5
 	move	aux,driv[7:2]
-	xmit	f_csr1,ivr
+	xmit	f_csr1,ivr	; read disk status DS1
 	move	sriv[0],r1
 	xmit	host8,ivr
 	xec	x01ae,r5
@@ -585,7 +616,7 @@ x018f:	call	sub_0790	; 11h
 	xmit	f_ram+2,ivr
 	xmit	0ffh,aux
 	move	aux,driv
-x019a:	xmit	f_csr3,ivr
+x019a:	xmit	fd_cntl,ivr
 	xmit	01h,driv[5]
 	call	sub_0676	; ret 12h
 	xmit	01h,aux
@@ -620,7 +651,7 @@ x01b2:	move	aux,driv[0]
 	move	aux,driv[5]
 	move	aux,driv[6]
 
-x01b6:	xmit	f_csr3,ivr
+x01b6:	xmit	fd_cntl,ivr
 	xmit	00h,driv[3]
 	xmit	00h,driv[4]
 	xmit	0d2h,r2
@@ -631,7 +662,7 @@ x01bc:	add	r1,r1
 	nzt	r1,x01bc
 	add	r2,r2
 	nzt	r2,x01bc
-	xmit	f_csr4,ivr
+	xmit	fd_sta,ivr
 	move	sriv[7],aux
 	nzt	aux,x01ce
 x01c4:	call	sub_0790	; ret 13h
@@ -645,7 +676,7 @@ x01cb:	xmit	00h,dliv[1]
 	call	sub_07b5	; ret 14h, does not return!
 
 x01ce:	xmit	0b1h,r3
-x01cf:	xmit	f_csr3,ivr
+x01cf:	xmit	fd_cntl,ivr
 	xmit	01h,driv[3]
 	xmit	00h,driv[4]
 	xmit	0d2h,r2
@@ -655,7 +686,7 @@ x01d4:	add	r1,r1
 	nzt	r1,x01d4
 	add	r2,r2
 	nzt	r2,x01d4
-	xmit	f_csr4,ivr
+	xmit	fd_sta,ivr
 	move	sriv[7],aux
 	nzt	aux,x01dd
 	jmp	x01c4
@@ -667,7 +698,7 @@ x01dd:	add	r3,r3
 	move	aux,driv
 	jmp	x039e
 
-x01e4:	xmit	f_csr4,ivr
+x01e4:	xmit	fd_sta,ivr
 	nzt	sriv[5],x01e7
 	jmp	x03a2
 
@@ -693,7 +724,7 @@ x01f3:	call	sub_07b3	; ret 16h
 	xmit	00h,driv[7]
 x01fd:	xmit	0c4h,aux
 	add	r4,aux
-	xmit	f_csr3,ivr
+	xmit	fd_cntl,ivr
 	xmit	00h,driv[1]
 	nzt	ovf,x0203
 	xmit	01h,driv[1]
@@ -766,27 +797,34 @@ x0244:	xmit	ram_02,ivl
 	xmit	0c0h,r1
 	move	r1,dliv
 	xmit	01h,aux
-	xmit	f_csr1,ivr
-	xmit	06h,driv[7:4]
-x024a:	xmit	f_csr4,ivr
+
+	xmit	f_csr1,ivr	; enable write gate, enable CRC, data only,
+	xmit	06h,driv[7:4]	; not sync enable
+
+x024a:	xmit	fd_sta,ivr
 	nzt	sriv[6],x0252
-x024c:	xmit	f_csr1,ivr
-	nzt	sriv[1],x024c
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
 	jmp	x024a
 
-x0252:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0252
+x0252:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
-	xmit	f_csr4,ivr
+	xmit	fd_sta,ivr
 	move	sriv[6],r1
 	nzt	r1,x0252
-x025a:	xmit	f_csr1,ivr
-	nzt	sriv[1],x025a
+
+x025a:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
@@ -794,8 +832,9 @@ x025a:	xmit	f_csr1,ivr
 	nzt	ovf,x0262
 	jmp	x025a
 
-x0262:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0262
+x0262:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
@@ -812,15 +851,18 @@ x026b:	xmit	f_csr1,ivr
 	nzt	ovf,x0273
 	jmp	x026b
 
-x0273:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0273
+x0273:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
 	nzt	r5,x0282
 	xmit	0f5h,r4
-x027a:	xmit	f_csr1,ivr
-	nzt	sriv[1],x027a
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	05h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -828,67 +870,88 @@ x027a:	xmit	f_csr1,ivr
 	xmit	7eh,r4
 	jmp	x0295
 
-x0282:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0282
+x0282:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	07h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
-x0288:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0288
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
 	xmit	2ah,r4
-x028e:	xmit	f_csr1,ivr
-	nzt	sriv[1],x028e
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	05h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r4,driv
 	xmit	54h,r4
-x0295:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0295
+
+x0295:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r4,driv
 	xmit	ram_08,ivl
-x029b:	xmit	f_csr1,ivr
-	nzt	sriv[1],x029b
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	07h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	sliv,driv
-x02a1:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02a1
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xmit	00h,driv
 	xmit	port2,ivr
 	move	sriv,r1
-x02a8:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02a8
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r1,driv
-x02ad:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02ad
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xmit	00h,driv
 	xmit	port3,ivr
 	add	sriv,driv
-x02b4:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02b4
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-x02b8:	xmit	f_csr1,ivr
-	xmit	00h,driv[6]
-	nzt	sriv[1],x02b8
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	xmit	00h,driv[6]	;   while writing 0 to CRC enable (CRC gen sources data)
+	nzt	sriv[1],$-2
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-x02bd:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02bd
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	01h,driv[6]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -896,16 +959,20 @@ x02bd:	xmit	f_csr1,ivr
 	xmit	0f0h,r1
 	nzt	r5,x02c6
 	xmit	0f7h,r1
-x02c6:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02c6
+
+x02c6:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	06h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
 	xmit	ram_02,ivl
 	move	r1,dliv
-x02ce:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02ce
+
+x02ce:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
@@ -913,8 +980,9 @@ x02ce:	xmit	f_csr1,ivr
 	nzt	ovf,x02d6
 	jmp	x02ce
 
-x02d6:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02d6
+x02d6:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
@@ -924,8 +992,9 @@ x02d6:	xmit	f_csr1,ivr
 x02de:	move	r1,dliv
 	jmp	x02e0
 
-x02e0:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02e0
+x02e0:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
@@ -933,15 +1002,18 @@ x02e0:	xmit	f_csr1,ivr
 	nzt	ovf,x02e8
 	jmp	x02e0
 
-x02e8:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02e8
+x02e8:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
 	nzt	r5,x02f7
 	xmit	0f5h,r4
-x02ef:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02ef
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	05h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -949,34 +1021,43 @@ x02ef:	xmit	f_csr1,ivr
 	xmit	6fh,r4
 	jmp	x030a
 
-x02f7:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02f7
+x02f7:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	07h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
-x02fd:	xmit	f_csr1,ivr
-	nzt	sriv[1],x02fd
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
 	xmit	2ah,r4
-x0303:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0303
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	05h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r4,driv
 	xmit	45h,r4
-x030a:	xmit	f_csr1,ivr
-	nzt	sriv[1],x030a
+
+x030a:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r4,driv
 	xmit	port2,ivr
 	move	sriv,r4
-x0311:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0311
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	07h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -984,39 +1065,50 @@ x0311:	xmit	f_csr1,ivr
 	xmit	ram_02,ivl
 	xmit	80h,r1
 	move	r1,dliv
-x031a:	xmit	f_csr1,ivr
-	nzt	sriv[1],x031a
+
+x031a:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	add	sliv,dliv
 	nzt	ovf,x0321
 	jmp	x031a
 
-x0321:	xmit	f_csr1,ivr
-	xmit	00h,driv[6]
-	nzt	sriv[1],x0321
+x0321:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	xmit	00h,driv[6]	;   while writing 0 to CRC enable (CRC gen sources data)
+	nzt	sriv[1],$-2
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	nzt	r5,x032b
-x0327:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0327
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-x032b:	xmit	f_csr1,ivr
-	nzt	sriv[1],x032b
+
+x032b:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	01h,driv[6]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
-x0331:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0331
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
 	xmit	port3,ivr
 	add	sriv,driv
-x0338:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0338
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
@@ -1027,8 +1119,9 @@ x033f:	xmit	f_csr1,ivr
 	xmit	01h,driv[7]
 	jmp	x039c
 
-x0342:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0342
+x0342:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	06h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -1039,8 +1132,10 @@ x0342:	xmit	f_csr1,ivr
 x034b:	xmit	ram_02,ivl
 	move	aux,dliv
 	xmit	01h,aux
-x034e:	xmit	f_csr1,ivr
-	nzt	sriv[1],x034e
+
+x034e:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
@@ -1051,8 +1146,10 @@ x034e:	xmit	f_csr1,ivr
 x0356:	xmit	0fah,r1
 	nzt	r5,x0359
 	xmit	0fch,r1
-x0359:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0359
+
+x0359:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r2,driv
@@ -1179,7 +1276,7 @@ x03bf:	call	sub_0676	; ret 1eh
 
 x03cc:	jmp	x0140
 
-x03cd:	xmit	f_csr4,ivr
+x03cd:	xmit	fd_sta,ivr
 	nzt	sriv[5],x03d0
 	jmp	x03a2
 
@@ -2099,7 +2196,7 @@ x0738:	xmit	ram_00,ivl
 	nzt	sliv[5],x073b
 	jmp	x0360
 
-x073b:	xmit	f_csr3,ivr
+x073b:	xmit	fd_cntl,ivr
 	xmit	01h,driv[5]
 	jmp	x0482
 
@@ -2183,7 +2280,7 @@ sub_077d:
 	xmit	00h,r2
 	xmit	00h,r1
 x0781:	xmit	01h,aux
-	xmit	f_csr4,ivr
+	xmit	fd_sta,ivr
 	nzt	sriv[6],x0785
 	return
 
@@ -2233,15 +2330,17 @@ x079b:	move	sliv[5],aux
 	move	r1,driv
 	xmit	f_ram+6,ivr
 	move	aux,driv
-	xmit	f_csr3,ivr
+	xmit	fd_cntl,ivr
 	move	r1,driv[7:2]
-	xmit	f_csr1,ivr
+
+	xmit	f_csr1,ivr	; test disk status DS1 input
 	move	sriv[0],aux
 	nzt	aux,x07b0
+
 	xmit	01h,driv[7]
 	return
 
-x07b0:	xmit	f_csr3,ivr
+x07b0:	xmit	fd_cntl,ivr
 	xmit	01h,driv[5]
 	jmp	x039a
 
@@ -2277,7 +2376,7 @@ x07c7:	xmit	0ffh,aux
 	add	r5,r4
 	xmit	80h,aux
 	and	r4,r4
-	xmit	f_csr3,ivr
+	xmit	fd_cntl,ivr
 	nzt	r4,x07d3
 	xmit	01h,driv[3]
 	xmit	0ffh,r4
@@ -2339,8 +2438,10 @@ x07fa:	xmit	f_csr1,ivr
 	xmit	0f5h,aux
 x0803:	xor	sriv,aux
 	nzt	aux,x080f
-x0805:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0805
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xmit	54h,aux
@@ -2378,9 +2479,11 @@ x081c:	xmit	port1,ivr
 x0820:	xmit	0ffh,aux
 	nzt	r5,x0823
 	xmit	00h,aux
+
 x0823:	xmit	f_csr1,ivr
 	xmit	06h,driv[6:4]
 	nzt	sriv[1],x0823
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xor	sriv,aux
@@ -2422,8 +2525,10 @@ x0844:	jmp	x0819
 	return
 
 x0846:	xmit	00h,r1
-x0847:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0847
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xmit	ram_08,ivl
@@ -2433,8 +2538,10 @@ x0847:	xmit	f_csr1,ivr
 	jmp	x0851
 
 x0850:	xmit	01h,r1
-x0851:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0851
+
+x0851:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	nzt	sriv,x0857
@@ -2458,8 +2565,10 @@ x0858:	xmit	ram_06,ivl
 	org	0860h
 	
 x0860:	nzt	sliv[1],x086b
-x0861:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0861
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	sriv,aux
@@ -2471,8 +2580,10 @@ x0861:	xmit	f_csr1,ivr
 
 x086b:	xmit	ram_09,ivl
 	move	sliv,aux
-x086d:	xmit	f_csr1,ivr
-	nzt	sriv[1],x086d
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xor	sriv,aux
@@ -2481,28 +2592,36 @@ x086d:	xmit	f_csr1,ivr
 
 x0874:	nzt	r1,x0876
 	xmit	02h,r1
-x0876:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0876
+
+x0876:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	nzt	sriv,x087c
 	jmp	x087d
 
 x087c:	xmit	03h,r1
-x087d:	xmit	f_csr1,ivr
-	nzt	sriv[1],x087d
+
+x087d:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	00h,driv[6]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-x0882:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0882
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xmit	0f1h,aux
 	nzt	r5,x0889
 	xmit	00h,aux
-x0889:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0889
+
+x0889:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	01h,driv[6]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -2511,8 +2630,10 @@ x0889:	xmit	f_csr1,ivr
 	xmit	0ceh,aux
 	nzt	r5,x0893
 	xmit	00h,aux
-x0893:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0893
+
+x0893:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xor	sriv,aux
@@ -2547,7 +2668,7 @@ x08a5:	call	sub_07b3	; ret 5bh
 x08b1:	xmit	ram_24,ivl
 	move	aux,dliv
 	xmit	0c4h,aux
-	xmit	f_csr3,ivr
+	xmit	fd_cntl,ivr
 	xmit	00h,driv[1]
 	add	r4,aux
 	nzt	ovf,x08b9
@@ -2641,8 +2762,9 @@ x08fb:	xmit	01h,aux
 
 	align	100h
 
-x0900:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0900
+x0900:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	sriv,r1
@@ -2659,17 +2781,22 @@ x0900:	xmit	f_csr1,ivr
 x090e:	xmit	02h,r1
 	jmp	x03a3
 
-x0910:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0910
+x0910:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	00h,driv[6]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-x0915:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0915
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-x0919:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0919
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	01h,driv[6]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -2678,8 +2805,10 @@ x0919:	xmit	f_csr1,ivr
 	xmit	00h,aux
 x0921:	xor	sriv,aux
 	nzt	aux,x090e
-x0923:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0923
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xmit	99h,aux
@@ -2724,7 +2853,7 @@ sub_093e:
 	xmit	00h,driv[7]
 x094a:	xmit	0c4h,aux
 	add	r4,aux
-	xmit	f_csr3,ivr
+	xmit	fd_cntl,ivr
 	xmit	00h,driv[1]
 	nzt	ovf,x0950
 	xmit	01h,driv[1]
@@ -2734,8 +2863,10 @@ x0950:	xmit	port1,ivr
 	xmit	port1,ivr
 	xmit	00h,driv[7]
 	xmit	0f5h,r3
-x0957:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0957
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xmit	0eh,r2
@@ -2744,8 +2875,9 @@ x0957:	xmit	f_csr1,ivr
 x095e:	xmit	0ffh,aux
 	jmp	x0960
 
-x0960:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0960
+x0960:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	add	r2,r2
@@ -2753,8 +2885,10 @@ x0960:	xmit	f_csr1,ivr
 	xmit	0ffh,r1
 	nzt	r5,x0969
 	xmit	00h,r1
-x0969:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0969
+
+x0969:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	06h,driv[7:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -2763,8 +2897,10 @@ x0969:	xmit	f_csr1,ivr
 	nzt	r5,x0972
 	xmit	0fbh,r1
 x0972:	xmit	01h,aux
-x0973:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0973
+
+x0973:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	add	r1,r1
@@ -2772,8 +2908,10 @@ x0973:	xmit	f_csr1,ivr
 	xmit	ram_06,ivl
 	move	sliv[0],r1
 	nzt	r5,x0986
-x097c:	xmit	f_csr1,ivr
-	nzt	sriv[1],x097c
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	05h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -2783,34 +2921,43 @@ x097c:	xmit	f_csr1,ivr
 	xmit	6fh,r3
 x0985:	jmp	x0999
 
-x0986:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0986
+x0986:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	07h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-x098b:	xmit	f_csr1,ivr
-	nzt	sriv[1],x098b
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	xmit	48h,r3
 	nzt	r1,x0992
 	xmit	2ah,r3
-x0992:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0992
+
+x0992:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	05h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
 	xmit	45h,r3
-x0999:	xmit	f_csr1,ivr
-	nzt	sriv[1],x0999
+
+x0999:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r3,driv
 	xmit	port2,ivr
 	move	sriv,r1
-x09a0:	xmit	f_csr1,ivr
-	nzt	sriv[1],x09a0
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	07h,driv[6:4]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
@@ -2820,42 +2967,55 @@ x09a6:	xmit	port3,ivr
 	nzt	ovf,x09b1
 	xmit	port2,ivr
 	move	sriv,r1
-x09ab:	xmit	f_csr1,ivr
-	nzt	sriv[1],x09ab
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r1,driv
 	jmp	x09a6
 
-x09b1:	xmit	f_csr1,ivr
-	nzt	sriv[1],x09b1
+x09b1:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-x09b5:	xmit	f_csr1,ivr
-	xmit	00h,driv[6]
-	nzt	sriv[1],x09b5
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	xmit	00h,driv[6]	;   while writing 0 to CRC enable (CRC gen sources data)
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	nzt	r5,x09bf
-x09bb:	xmit	f_csr1,ivr
-	nzt	sriv[1],x09bb
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 x09bf:	xmit	00h,r1
 	nzt	r5,x09c2
 	xmit	0ffh,r1
-x09c2:	xmit	f_csr1,ivr
-	nzt	sriv[1],x09c2
+
+x09c2:	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	01h,driv[6]
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	r1,driv
-x09c8:	xmit	f_csr1,ivr
-	nzt	sriv[1],x09c8
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	f_data,ivr
 	xmit	f_data,ivr
-x09cc:	xmit	f_csr1,ivr
-	nzt	sriv[1],x09cc
+
+	xmit	f_csr1,ivr	; wait for BYTRA = 0
+	nzt	sriv[1],$-1
+
 	xmit	01h,driv[7]
 	xmit	port1,ivr
 	xmit	1fh,driv[4:0]
