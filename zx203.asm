@@ -76,8 +76,10 @@ ram_2f	liv	2fh
 ram_30	liv	30h
 ram_31	liv	31h
 ram_32	liv	32h
-ram_33	liv	33h
-ram_34	liv	34h
+
+ret_adr_2	liv	33h
+ret_adr_3	liv	34h
+
 ram_35	liv	35h
 ram_36	liv	36h
 
@@ -107,20 +109,20 @@ dip_sw	riv	09h	; DIP switches, bits 7, 6, 2..0 used
 
 ; 8X320 bus interface from 30h..3fh
 host0	riv	30h
-host2	riv	32h
-host3	riv	33h
-host4	riv	34h
-host5	riv	35h
-host6	riv	36h
-host7	riv	37h
-host8	riv	38h
-host9	riv	39h
-hosta	riv	3ah
-hostb	riv	3bh
-hostc	riv	3ch
-hostd	riv	3dh
-hoste	riv	3eh
-hostf	riv	3fh
+host2	riv	32h	; low byte IOPB addr
+host3	riv	33h	; high byte IOPB addr (first floppy cont)
+host4	riv	34h	; high byte IOPB addr (second floppy cont)
+host5	riv	35h	; high byte IOPB addr (hard disk cont)
+host6	riv	36h	; ?
+host7	riv	37h	; ?
+host8	riv	38h	; subsystem status to host (first floppy cont)
+host9	riv	39h	; subsystem status to host (second floppy cont)
+hosta	riv	3ah	; subsystem status to host (hard disk cont)
+hostb	riv	3bh	; result type to host
+hostc	riv	3ch	; result byte to host
+hostd	riv	3dh	; ?
+hoste	riv	3eh	; gets initialized to zero, but never otherwise used
+hostf	riv	3fh	; gets initialized to zero, but never otherwise used
 
 ; 8X330 RAM from 48h..57h
 f_ram	riv	48h
@@ -1920,8 +1922,9 @@ sub_0627:
 	return
 
 sub_0639:
-	xmit	ram_34,ivl
+	xmit	ret_adr_3,ivl	; save return address 3
 	move	r11,dliv
+
 	xmit	ram_38,ivl
 	xmit	39h,aux
 	move	aux,dliv
@@ -1945,7 +1948,7 @@ sub_0639:
 	xmit	00h,r1
 	call	sub_065b	; ret 50h
 	call	sub_0ca8	; ret 51h
-	jmp	x0cdb
+	jmp	return3
 
 	return			; inserted automatically by MCCAP
 
@@ -2049,10 +2052,11 @@ x069f:	jmp	x06a0
 ; XXX end of unreachable code
 
 
-x06a0:	nzt	sriv[2],x06a6
-	nzt	sriv[3],x06a8
-	nzt	sriv[4],x06aa
-	nzt	sriv[5],x06ac
+; enters here with riv pointing to host0 
+x06a0:	nzt	sriv[2],x06a6	; host 2 loaded?
+	nzt	sriv[3],x06a8	; host 3 loaded?
+	nzt	sriv[4],x06aa	; host 4 loaded?
+	nzt	sriv[5],x06ac	; host 5 loaded?
 x06a4:	xmit	00h,driv
 	return
 
@@ -2069,13 +2073,16 @@ x06ac:	xmit	hostd,ivr
 	nzt	sriv[7],x06ba
 	xmit	01h,driv[7]
 	xmit	host5,ivr
-x06b0:	xmit	0ch,aux
+
+x06b0:	xmit	0ch,aux		; store byte in array [ram_0c..ram_0f]
 	add	sliv[1:0],ivl
 	move	sriv,dliv
-	xmit	ram_31,ivl
+
+	xmit	ram_31,ivl	; increment ram_31
 	xmit	01h,aux
 	add	sliv,dliv
-	xmit	host0,ivr
+
+	xmit	host0,ivr	; host2 loaded?
 	move	sriv[2],aux
 	nzt	aux,x06a4
 	jmp	x06bd
@@ -2230,28 +2237,33 @@ x073b:	xmit	fd_cntl,ivr
 
 
 sub_073f:
-	xmit	ram_33,ivl		; save return address
+	xmit	ret_adr_2,ivl	; save return address 2
 	move	r11,dliv
 
-	xmit	ram_02,ivl
+	xmit	ram_02,ivl	; init counter to zero
 	xmit	00h,dliv
+
 x0743:	xmit	port1,ivr
 	xmit	13h,driv[4:0]
 	xmit	ram_02,ivl
-	xmit	01h,aux
+
+	xmit	01h,aux		; increment counter and test
 	add	sliv,dliv
 	nzt	ovf,x074f
+
 	xmit	dip_sw,ivr
 	move	sriv[7],aux
 	nzt	aux,x0752
+
 	call	sub_0676	; ret 57h
 	jmp	x0743
 
 x074f:	xmit	66h,r1
 	call	sub_0c83	; ret 58h
+
 x0752:	xmit	port1,ivr
 	xmit	1fh,driv[4:0]
-	jmp	x0cd9
+	jmp	return2
 
 	return			; inserted automatically by MCCAP
 
@@ -2372,7 +2384,7 @@ x07b0:	xmit	fd_cntl,ivr
 
 
 sub_07b3:
-	xmit	ram_33,ivl		; save return address
+	xmit	ret_adr_2,ivl	; save return address 2
 	move	r11,dliv
 
 sub_07b5:
@@ -2393,7 +2405,7 @@ x07bd:	move	sriv,r5
 	xmit	f_ram+6,ivr
 	move	sriv,aux
 	nzt	aux,x07e7
-	jmp	x0cd9
+	jmp	return2
 
 x07c7:	xmit	0ffh,aux
 	xor	r3,r4
@@ -2435,7 +2447,7 @@ x07e9:	add	r2,r2
 	nzt	r2,x07e9
 	add	r1,r1
 	nzt	r1,x07e9
-	jmp	x0cd9
+	jmp	return2
 
 	return			; inserted automatically by MCCAP
 
@@ -2485,7 +2497,7 @@ x080f:	jmp	x0831		; not an M2FM ID address mark
 
 
 sub_0811:
-	xmit	ram_33,ivl		; save return address
+	xmit	ret_adr_2,ivl	; save return address 2
 	move	r11,dliv
 
 	xmit	f_csr2,ivr
@@ -2501,7 +2513,7 @@ x0819:	xmit	0fdh,r6
 x081c:	xmit	port1,ivr
 	xmit	00h,driv[7]
 
-	xmit	ram_33,ivl		; restore return address
+	xmit	ret_adr_2,ivl	; restore return address 2
 	move	sliv,r11
 
 x0820:	xmit	0ffh,aux
@@ -2525,7 +2537,7 @@ x0823:	xmit	f_csr1,ivr
 
 	return
 
-x0831:	xmit	ram_33,ivl		; restore return address
+x0831:	xmit	ret_adr_2,ivl	; restore return address 2
 	move	sliv,r11
 
 	xmit	01h,aux
@@ -2679,8 +2691,9 @@ x08a0:	jmp	x03a0
 
 
 sub_08a1:
-	xmit	ram_34,ivl
+	xmit	ret_adr_3,ivl	; save return address 3
 	move	r11,dliv
+
 	xmit	port1,ivr
 	xmit	1ch,driv[4:0]
 x08a5:	call	sub_07b3	; ret 5bh
@@ -2866,7 +2879,7 @@ x0935:	xmit	62h,aux
 x0938:	xmit	f_ram+5,ivr
 	xor	sriv,aux
 	nzt	aux,x093c
-	jmp	x0cdb
+	jmp	return3
 
 x093c:	jmp	x08a5
 
@@ -2874,7 +2887,7 @@ x093c:	jmp	x08a5
 
 
 sub_093e:
-	xmit	ram_34,ivl		; save return address
+	xmit	ret_adr_3,ivl	; save return address 3
 	move	r11,dliv
 
 	call	sub_07b3	; ret 5e
@@ -3055,7 +3068,7 @@ x09c2:	xmit	f_csr1,ivr	; wait for BYTRA = 0
 	xmit	01h,driv[7]
 	xmit	port1,ivr
 	xmit	1fh,driv[4:0]
-	jmp	x0cdb
+	jmp	return3
 
 	return			; inserted automatically by MCCAP
 
@@ -3078,7 +3091,7 @@ sub_09dc:
 	return
 
 
-x09df:	xmit	ram_33,ivl		; save return address
+x09df:	xmit	ret_adr_2,ivl	; save return address 2
 	move	r11,dliv
 
 	xmit	ram_38,ivl
@@ -3236,7 +3249,7 @@ sub_0a6b:
 	xmit	1bh,aux
 x0a71:	move	aux,driv
 
-	xmit	ram_33,ivl		; save return address
+	xmit	ret_adr_2,ivl	; save return address 2
 	move	r11,dliv
 
 x0a74:	xmit	port6,ivr
@@ -3359,7 +3372,7 @@ x0ade:	return
 
 
 sub_0adf:
-	xmit	ram_33,ivl		; save return address
+	xmit	ret_adr_2,ivl	; save return address 2
 	move	r11,dliv
 
 	xmit	00h,r6
@@ -3445,13 +3458,13 @@ x0b22:	xmit	ram_1c,ivl
 	add	sliv,dliv
 	xmit	port1,ivr
 	xmit	1fh,driv[4:0]
-	jmp	x0cd9
+	jmp	return2
 
 	return			; inserted automatically by MCCAP
 
 
 sub_0b2f:
-	xmit	ram_33,ivl		; save return address
+	xmit	ret_adr_2,ivl	; save return address 2
 	move	r11,dliv
 
 	xmit	00h,r6
@@ -3517,7 +3530,7 @@ x0b67:	move	r6,aux
 	move	ovf,aux
 	xmit	ram_1e,ivl
 	add	sliv,dliv
-	jmp	x0cd9
+	jmp	return2
 
 	return
 
@@ -3540,7 +3553,7 @@ sub_0b7d:
 	xmit	80h,r1
 
 sub_0b7e:
-	xmit	ram_33,ivl		; save return address
+	xmit	ret_adr_2,ivl	; save return address 2
 	move	r11,dliv
 
 	xmit	ram_03,ivl
@@ -3596,13 +3609,16 @@ x0ba6:	xmit	port7,ivr
 	nzt	aux,x0bb2
 	jmp	sub_0bb4
 
-x0bb2:	jmp	x0cd9
+x0bb2:	jmp	return2
 
 	return			; inserted automatically by MCCAP
 
 
+; XXX It makes sense for code above to jump here, but why would there be
+; any subroutine call to here, when the return address in r11 will
+; get clobbered?
 sub_0bb4:
-	xmit	ram_33,ivl		; restore return address
+	xmit	ret_adr_2,ivl	; restore return address 2
 	move	sliv,r11
 
 sub_0bb6:
@@ -3811,7 +3827,8 @@ x0c6c:	xmit	ram_42,ivl
 	xmit	host7,ivr
 	move	r1,driv
 	nzt	r1,x0c79
-x0c71:	xmit	01h,aux
+
+x0c71:	xmit	01h,aux		; delay
 	xmit	00h,r1
 	xmit	0feh,r2
 x0c74:	add	r1,r1
@@ -3819,6 +3836,7 @@ x0c74:	add	r1,r1
 	add	r2,r2
 	nzt	r2,x0c74
 	jmp	x0482
+
 
 x0c79:	xmit	0e8h,aux
 	add	r1,aux		
@@ -3856,6 +3874,7 @@ sub_0c91:
 	xmit	00h,driv
 	xmit	hostb,ivr
 	xmit	00h,driv
+
 sub_0c95:
 	xmit	hosta,ivr
 	xmit	ram_05,ivl
@@ -3880,8 +3899,9 @@ sub_0c95:
 
 
 sub_0ca8:
-	xmit	ram_33,ivl
+	xmit	ret_adr_2,ivl	; save return address 2
 	move	r11,dliv
+
 	xmit	ram_04,ivl
 	xmit	00h,dliv
 	xmit	port7,ivr
@@ -3930,11 +3950,16 @@ x0ccd:	xmit	0ffh,aux
 	call	sub_0bb4	; ret 81h
 	return
 
-x0cd9:	xmit	ram_33,ivl
-	jmp	x0cdc
 
-x0cdb:	xmit	ram_34,ivl
-x0cdc:	move	sliv,r11
+; return from outer subroutine nesting via r33
+return2:
+	xmit	ret_adr_2,ivl
+	jmp	$+2
+
+; return from outer subroutine nesting via r34
+return3:
+	xmit	ret_adr_3,ivl
+	move	sliv,r11
 	return
 
 
