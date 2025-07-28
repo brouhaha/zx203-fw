@@ -1,6 +1,6 @@
 ; Zendex ZX-203 Disk Controller firmware
 
-; Assembly source code copyright 2016 Eric Smith <spacewar@gmail.com>
+; Assembly source code copyright 2016, 2025 Eric Smith <spacewar@gmail.com>
 
 ; No copyright is claimed on the executable object code as
 ; found in the ZX-203 PROM chips.
@@ -125,7 +125,15 @@ hoste	riv	3eh	; gets initialized to zero, but never otherwise used
 hostf	riv	3fh	; gets initialized to zero, but never otherwise used
 
 ; 8X330 RAM from 48h..57h
-f_ram	riv	48h
+f_ram_0	riv	48h
+f_ram_1	riv	49h
+f_ram_2	riv	4ah
+f_ram_3	riv	4bh
+f_ram_4	riv	4ch
+f_ram_5	riv	4dh
+f_ram_6	riv	4eh
+f_ram_7	riv	4fh
+; 50h..57h appear to be unused
 
 ; 8X330 floppy control registers
 f_csr1	riv	5ah	; disk command (write), disk status (read)
@@ -219,10 +227,10 @@ f_data	riv	5fh	; data
 	xmit	00h,driv
 
 	xmit	0ffh,aux
-	xmit	f_ram+7,ivr
+	xmit	f_ram_7,ivr
 	move	aux,driv
 
-	xmit	f_ram+2,ivr
+	xmit	f_ram_2,ivr
 	move	aux,driv
 
 	xmit	ram_3f,ivl
@@ -234,10 +242,10 @@ f_data	riv	5fh	; data
 	xmit	ram_41,ivl
 	move	aux,dliv
 
-	xmit	f_ram+0,ivr
+	xmit	f_ram_0,ivr
 	move	aux,driv
 
-	xmit	f_ram+1,ivr
+	xmit	f_ram_1,ivr
 	move	aux,driv
 
 	xmit	7fh,aux
@@ -524,7 +532,7 @@ x00d6:	jmp	x0a57
 ; XXX end of unreachable code
 
 
-x0140:	xmit	f_ram+7,ivr
+x0140:	xmit	f_ram_7,ivr
 	xmit	1fh,driv[4:0]
 	call	sub_0676	; ret 0fh
 	xmit	26h,r6
@@ -614,11 +622,11 @@ x0171:	xmit	fd_cntl,ivr
 x018f:	call	sub_0790	; 11h
 	xmit	0ffh,aux
 	move	aux,driv
-	xmit	f_ram+4,ivr
+	xmit	f_ram_4,ivr
 	move	sriv,aux
 	xor	r5,aux
 	nzt	aux,x019a
-	xmit	f_ram+2,ivr
+	xmit	f_ram_2,ivr
 	xmit	0ffh,aux
 	move	aux,driv
 x019a:	xmit	fd_cntl,ivr
@@ -711,12 +719,12 @@ x01e4:	xmit	fd_sta,ivr
 
 x01e7:	xmit	ram_06,ivl
 	move	sliv[5:4],aux
-	xmit	f_ram+4,ivr
+	xmit	f_ram_4,ivr
 	xor	sriv,aux
 	nzt	aux,x01f3
 	xmit	ram_08,ivl
 	move	sliv,aux
-	xmit	f_ram+2,ivr
+	xmit	f_ram_2,ivr
 	xor	sriv,aux
 	nzt	aux,x01f3
 	xmit	0ffh,aux
@@ -1309,12 +1317,12 @@ x03cd:	xmit	fd_sta,ivr
 
 x03d0:	xmit	ram_06,ivl
 	move	sliv[5:4],aux
-	xmit	f_ram+4,ivr
+	xmit	f_ram_4,ivr
 	xor	sriv,aux
 	nzt	aux,x03dc
 	xmit	ram_08,ivl
 	move	sliv,aux
-	xmit	f_ram+2,ivr
+	xmit	f_ram_2,ivr
 	xor	sriv,aux
 	nzt	aux,x03dc
 	xmit	0ffh,aux
@@ -1345,12 +1353,12 @@ x03f0:	xmit	01h,aux
 
 x03f4:	xmit	ram_08,ivl
 	move	sliv,aux
-	xmit	f_ram+2,ivr
+	xmit	f_ram_2,ivr
 	xor	sriv,aux
 	nzt	aux,x03ff
 	xmit	ram_06,ivl
 	move	sliv[5:4],aux
-	xmit	f_ram+4,ivr
+	xmit	f_ram_4,ivr
 	xor	sriv,aux
 	nzt	aux,x03ff
 	jmp	x0409
@@ -1358,11 +1366,11 @@ x03f4:	xmit	ram_08,ivl
 x03ff:	call	sub_08a1	; ret 21h
 	xmit	ram_08,ivl
 	move	sliv,aux
-	xmit	f_ram+2,ivr
+	xmit	f_ram_2,ivr
 	move	aux,driv
 	xmit	ram_06,ivl
 	move	sliv[5:4],aux
-	xmit	f_ram+4,ivr
+	xmit	f_ram_4,ivr
 	move	aux,driv
 x0409:	xmit	ram_09,ivl
 	move	sliv[0],r3
@@ -1386,12 +1394,12 @@ x0418:	xmit	01h,aux
 
 x041c:	xmit	ram_08,ivl
 	move	sliv,aux
-	xmit	f_ram+2,ivr
+	xmit	f_ram_2,ivr
 	xor	sriv,aux
 	nzt	aux,x0427
 	xmit	ram_06,ivl
 	move	sliv[5:4],aux
-	xmit	f_ram+4,ivr
+	xmit	f_ram_4,ivr
 	xor	sriv,aux
 	nzt	aux,x0427
 	jmp	x039c
@@ -1399,11 +1407,11 @@ x041c:	xmit	ram_08,ivl
 x0427:	call	sub_08a1	; ret 23h
 	xmit	ram_08,ivl
 	move	sliv,aux
-	xmit	f_ram+2,ivr
+	xmit	f_ram_2,ivr
 	move	aux,driv
 	xmit	ram_06,ivl
 	move	sliv[5:4],aux
-	xmit	f_ram+4,ivr
+	xmit	f_ram_4,ivr
 	move	aux,driv
 	jmp	x039c
 
@@ -2344,8 +2352,8 @@ sub_0790:
 	return
 
 ; xec table
-x0794:	xmit	f_ram+0,ivr
-	xmit	f_ram+1,ivr
+x0794:	xmit	f_ram_0,ivr
+	xmit	f_ram_1,ivr
 
 
 sub_0796:
@@ -2362,11 +2370,11 @@ x079b:	move	sliv[5],aux
 	xmit	01h,aux
 	xor	sliv[5],aux
 	add	r1,r1
-	xmit	f_ram+7,ivr
+	xmit	f_ram_7,ivr
 	move	sriv,aux
 	xor	r1,aux
 	move	r1,driv
-	xmit	f_ram+6,ivr
+	xmit	f_ram_6,ivr
 	move	aux,driv
 	xmit	fd_cntl,ivr
 	move	r1,driv[7:2]
@@ -2402,7 +2410,7 @@ x07bd:	move	sriv,r5
 	move	r5,aux
 	xor	r3,r2
 	nzt	r2,x07c7
-	xmit	f_ram+6,ivr
+	xmit	f_ram_6,ivr
 	move	sriv,aux
 	nzt	aux,x07e7
 	jmp	return2
@@ -2612,9 +2620,9 @@ x0860:	nzt	sliv[1],x086b
 	xmit	f_data,ivr
 	xmit	f_data,ivr
 	move	sriv,aux
-	xmit	f_ram+3,ivr
+	xmit	f_ram_3,ivr
 	move	aux,driv
-	xmit	f_ram+5,ivr
+	xmit	f_ram_5,ivr
 	add	sriv,driv
 	jmp	x0876
 
@@ -2698,10 +2706,10 @@ sub_08a1:
 	xmit	1ch,driv[4:0]
 x08a5:	call	sub_07b3	; ret 5bh
 	call	sub_07ef	; ret 5ch
-	xmit	f_ram+4,ivr
+	xmit	f_ram_4,ivr
 	xmit	0ffh,aux
 	move	aux,driv
-	xmit	f_ram+5,ivr
+	xmit	f_ram_5,ivr
 	xmit	00h,driv
 	xmit	0cch,aux
 	nzt	r5,x08b1
@@ -2719,7 +2727,7 @@ x08b9:	call	sub_0811		; ret 5dh
 	xmit	f_csr2,ivr
 	xmit	00h,driv[6]		; read mode
 
-	xmit	f_ram+3,ivr
+	xmit	f_ram_3,ivr
 	move	sriv[0],aux
 	move	sriv[7:1],r1
 	xmit	port3,ivr
@@ -2876,7 +2884,7 @@ x092a:	xor	sriv,aux
 x0935:	xmit	62h,aux
 	nzt	r5,x0938
 	xmit	5fh,aux
-x0938:	xmit	f_ram+5,ivr
+x0938:	xmit	f_ram_5,ivr
 	xor	sriv,aux
 	nzt	aux,x093c
 	jmp	return3
